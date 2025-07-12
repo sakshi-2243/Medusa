@@ -19,28 +19,28 @@ resource "aws_iam_role" "exec_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "attach" {
-  role = aws_iam_role.exec_role.name
+  role       = aws_iam_role.exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_security_group" "sg" {
-  name = "medusa-sg"
-  description = "Allow traffic on 9000"
-  vpc_id = var.vpc_id
+  name        = "medusa-sg"
+  description = "Allow traffic on port 9000"
+  vpc_id      = var.vpc_id
 
   ingress {
-    from_port = 9000
-    to_port = 9000
-    protocol = "tcp"
+    from_port   = 9000
+    to_port     = 9000
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
- egress {
-  from_port   = 0
-  to_port     = 0
-  protocol    = "-1"
-  cidr_blocks = ["0.0.0.0/0"]
-}
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_ecs_task_definition" "task" {
@@ -51,19 +51,16 @@ resource "aws_ecs_task_definition" "task" {
   memory                   = "1024"
   execution_role_arn       = aws_iam_role.exec_role.arn
 
-  container_definitions = jsonencode([
-    {
-      name      = "medusa",
-      image     = "${var.ecr_repo_url}:latest",
-      essential = true,
-      portMappings = [
-        {
-          containerPort = 9000,
-          hostPort      = 9000
-        }
-      ]
-    }
-  ])
+  container_definitions = jsonencode([{
+    name      = "medusa",
+    image     = "${var.ecr_repo_url}:latest",
+    essential = true,
+    portMappings = [{
+      containerPort = 9000,
+      hostPort      = 9000,
+      protocol      = "tcp"
+    }]
+  }])
 }
 
 resource "aws_ecs_service" "service" {
@@ -79,7 +76,18 @@ resource "aws_ecs_service" "service" {
     security_groups  = [aws_security_group.sg.id]
   }
 
-  depends_on = [aws_ecs_cluster.main] # optional, adds safety for ordering
+  deployment_controller {
+    type = "ECS"
+  }
+
+  force_new_deployment = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [
+    aws_ecs_cluster.main,
+    aws_iam_role_policy_attachment.attach
+  ]
 }
-
-

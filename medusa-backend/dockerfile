@@ -1,0 +1,21 @@
+# Use official Node.js base image
+FROM node:18
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and install dependencies
+COPY package.json ./
+RUN npm install
+
+# Copy the rest of the Medusa app
+COPY . .
+
+# Build the Medusa backend (optional for production)
+RUN npm run build
+
+# Expose the port Medusa runs on
+EXPOSE 9000
+
+# Start Medusa server
+CMD ["npm", "run", "start"]

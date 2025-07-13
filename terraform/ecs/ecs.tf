@@ -79,7 +79,7 @@ resource "aws_ecs_task_definition" "task" {
     logDriver = "awslogs"
     options = {
       awslogs-group         = "/ecs/medusa"
-      awslogs-region        = "us-west-2"
+      awslogs-region        = "ap-south-1"
       awslogs-stream-prefix = "medusa"
     }
   }

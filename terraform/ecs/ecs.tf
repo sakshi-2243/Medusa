@@ -67,16 +67,23 @@ resource "aws_ecs_task_definition" "task" {
   execution_role_arn       = aws_iam_role.exec_role.arn
 
   container_definitions = jsonencode([{
-    name      = "medusa"
-    image     = "${var.ecr_repo_url}:latest"
-    essential = true
-    portMappings = [{
-      containerPort = 9000
-      hostPort      = 9000
-      protocol      = "tcp"
-    }]
-  }])
-}
+  name      = "medusa"
+  image     = "${var.ecr_repo_url}:latest"
+  essential = true
+  portMappings = [{
+    containerPort = 9000
+    hostPort      = 9000
+    protocol      = "tcp"
+  }],
+  logConfiguration = {
+    logDriver = "awslogs"
+    options = {
+      awslogs-group         = "/ecs/medusa"
+      awslogs-region        = "us-west-2"
+      awslogs-stream-prefix = "medusa"
+    }
+  }
+}])
 
 # ECS Service
 resource "aws_ecs_service" "service" {

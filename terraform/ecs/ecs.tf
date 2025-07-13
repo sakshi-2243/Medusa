@@ -80,7 +80,7 @@ resource "aws_ecs_task_definition" "task" {
 
 # ECS Service
 resource "aws_ecs_service" "service" {
-  name            = medusa-service-v2
+  name            = "medusa-service-v2"  # ✅ PUT IN QUOTES
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.task.arn
   desired_count   = 1
@@ -100,7 +100,6 @@ resource "aws_ecs_service" "service" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes = [desired_count]  # Prevent conflict during scaling
   }
 
   depends_on = [

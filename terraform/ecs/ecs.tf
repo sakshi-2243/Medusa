@@ -1,124 +1,37 @@
-variable "vpc_id" {}
-variable "subnets" {
-  type = list(string)
-}
-variable "ecr_repo_url" {
-  type = string
-}
-
-resource "aws_ecs_cluster" "main" {
+resource "aws_ecs_cluster" "medusa_cluster" {
   name = "medusa-cluster"
 }
 
-# IAM Role for ECS task execution
-resource "aws_iam_role" "exec_role" {
-  name = "ecsTaskExecutionRole"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        },
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "attach" {
-  role       = aws_iam_role.exec_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-# Security Group
-resource "aws_security_group" "sg" {
-  name        = "medusa-sg"
-  description = "Allow HTTP on port 9000"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 9000
-    to_port     = 9000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "medusa-sg"
-  }
-}
-
-# ECS Task Definition
-resource "aws_ecs_task_definition" "task" {
+resource "aws_ecs_task_definition" "medusa_task" {
   family                   = "medusa-task"
   requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
   cpu                      = "512"
   memory                   = "1024"
-  execution_role_arn       = aws_iam_role.exec_role.arn
+  network_mode             = "awsvpc"
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
-  container_definitions = jsonencode([
-    {
-      name      = "medusa"
-      image     = "${var.ecr_repo_url}:latest"
-      essential = true
-
-      portMappings = [
-        {
-          containerPort = 9000
-          hostPort      = 9000
-          protocol      = "tcp"
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/medusa"
-          awslogs-region        = "ap-south-1" # replace with your region
-          awslogs-stream-prefix = "medusa"
-        }
-      }
-    }
-  ])
+  container_definitions = jsonencode([{
+    name      = "medusa"
+    image     = "${aws_ecr_repository.medusa_repo.repository_url}:latest"
+    essential = true
+    portMappings = [{
+      containerPort = 9000
+      hostPort      = 9000
+    }]
+  }])
 }
 
-
-# ECS Service
-resource "aws_ecs_service" "service" {
-  name            = "medusa-service-v1"  # ✅ PUT IN QUOTES
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.task.arn
-  desired_count   = 1
+resource "aws_ecs_service" "medusa_service" {
+  name            = "medusa-service"
+  cluster         = aws_ecs_cluster.medusa_cluster.id
+  task_definition = aws_ecs_task_definition.medusa_task.arn
   launch_type     = "FARGATE"
+  desired_count   = 1
 
   network_configuration {
-    subnets          = var.subnets
+    subnets = aws_subnet.public[*].id  # ✅ this will use all subnets you just defined
+
     assign_public_ip = true
-    security_groups  = [aws_security_group.sg.id]
+    security_groups  = [aws_security_group.allow_http.id]
   }
-
-  deployment_controller {
-    type = "ECS"
-  }
-
-  force_new_deployment = true
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  depends_on = [
-    aws_ecs_cluster.main,
-    aws_iam_role_policy_attachment.attach
-  ]
 }

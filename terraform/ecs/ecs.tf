@@ -32,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Security Group: allow access on port 9000
+# Security Group
 resource "aws_security_group" "sg" {
   name        = "medusa-sg"
   description = "Allow HTTP on port 9000"
@@ -57,7 +57,7 @@ resource "aws_security_group" "sg" {
   }
 }
 
-# Task Definition
+# ECS Task Definition
 resource "aws_ecs_task_definition" "task" {
   family                   = "medusa-task"
   requires_compatibilities = ["FARGATE"]
@@ -66,20 +66,16 @@ resource "aws_ecs_task_definition" "task" {
   memory                   = "1024"
   execution_role_arn       = aws_iam_role.exec_role.arn
 
-  container_definitions = jsonencode([
-    {
-      name      = "medusa"
-      image     = "${var.ecr_repo_url}:latest"
-      essential = true
-      portMappings = [
-        {
-          containerPort = 9000
-          hostPort      = 9000
-          protocol      = "tcp"
-        }
-      ]
-    }
-  ])
+  container_definitions = jsonencode([{
+    name      = "medusa"
+    image     = "${var.ecr_repo_url}:latest"
+    essential = true
+    portMappings = [{
+      containerPort = 9000
+      hostPort      = 9000
+      protocol      = "tcp"
+    }]
+  }])
 }
 
 # ECS Service
@@ -91,8 +87,8 @@ resource "aws_ecs_service" "service" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.subnets            # ✅ Must be public subnets
-    assign_public_ip = true                   # ✅ Needed for internet access
+    subnets          = var.subnets
+    assign_public_ip = true
     security_groups  = [aws_security_group.sg.id]
   }
 
@@ -104,6 +100,7 @@ resource "aws_ecs_service" "service" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [desired_count]  # Prevent conflict during scaling
   }
 
   depends_on = [

@@ -1,7 +1,3 @@
-resource "aws_ecr_repository" "medusa" {
+resource "aws_ecr_repository" "medusa_repo" {
   name = "medusa-backend"
-}
-
-output "repository_url" {
-  value = aws_ecr_repository.medusa.repository_url
 }
